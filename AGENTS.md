@@ -65,16 +65,14 @@ Budget signals: "cheap eats," "somewhere nice," "not too expensive"
 Location: "near downtown," "walking distance from campus"
 Builds per-user preference memory across sessions
 3. Multi-Source Venue Search
-Queries: Google Places, Yelp, OpenTable, Resy
-Filters by: cuisine, price, location, availability, ratings
-Returns top 3-4 options optimized for group constraints
+Browserbase/Stagehand browses Google, Yelp, OpenTable directly instead of querying APIs
 4. Decision Facilitation
 Tracks responses and votes
 Shows live tally ("3 votes for Rosa's, 1 for Thai Basil")
 Prompts non-responders when needed
 Declares decision when threshold reached (majority or unanimous)
 5. Browser-Based Reservation
-Uses browser automation (likely Browserbase) to:
+Uses Browserbase and Stagehand to:
 Search for restaurant booking pages
 Navigate reservation flow
 Fill in party size, date, time
@@ -86,24 +84,21 @@ Includes: venue, address, date, time, party size, confirmation number
 Sends reminder day-before and day-of
 
 Technical Stack
-Core Components
-LLM Orchestration
-Claude SDK as the agent
-Memory Layer
-Per-group conversation history
-Per-user preference profiles
-Past venue experiences (positive/negative sentiment)
-Search & Discovery
-Google Places API
-Yelp Fusion API
-OpenTable/Resy availability check APIs
-Fallback to web search when APIs unavailable
-Booking Automation
-Browserbase for booking automation
-Messaging Interface
-iMessage Business Chat API / Extension
-Message parsing and sending
-Rich media support (maps, images, structured layouts)
+
+Poke -- The conversational agent platform. Handles iMessage group chat integration, multi-turn conversation, intent detection, preference extraction, and decision facilitation. Connected to the MCP server via poke.com/settings/connections.
+
+
+
+Claude Agent SDK -- Powers the AI reasoning inside the MCP server tools. Used for orchestrating multi-step browser workflows (e.g., "search for Italian restaurants near downtown, extract top 4 results, format them"). Provides the @tool decorator and agent loop for custom tool logic.
+
+
+
+Browserbase + Stagehand -- Cloud headless browser infrastructure. Stagehand's act(), extract(), observe() primitives let the agent browse Google/Yelp/OpenTable for venue search AND navigate reservation booking flows. Browserbase provides stealth mode, captcha solving, and session persistence (Contexts) so login state on booking sites can be reused.
+
+
+
+FastMCP Server (Render) -- The MCP server (src/server.py) hosts the custom tools that Poke calls. Deployed on Render. Exposes tools like venue_search and make_reservation.
+
 
 Conversation Design Principles
 1. Guided, Not Rigid
