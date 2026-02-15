@@ -1,46 +1,68 @@
 import "dotenv/config";
 import { Stagehand } from "@browserbasehq/stagehand";
 
+type BookingInput = {
+  url: string;
+  time_text: string;
+  party_size: number;
+};
+
+async function readStdin(): Promise<string> {
+  return new Promise((resolve) => {
+    let data = "";
+    process.stdin.setEncoding("utf8");
+    process.stdin.on("data", (chunk) => (data += chunk));
+    process.stdin.on("end", () => resolve(data));
+  });
+}
+
 async function main() {
+  console.info("Launching browser...");
   const stagehand = new Stagehand({
-  env: "BROWSERBASE",
-  model: {
-    modelName: "anthropic/claude-haiku-4-5",
-    apiKey: process.env.ANTHROPIC_API_KEY,
-    baseURL: "https://custom-anthropic-endpoint.com",
-  },
-});
+    env: "LOCAL",
+    modelApiKey: process.env.GOOGLE_API_KEY,
+    model: "gemini-2.0-flash",
+  });
 
   await stagehand.init();
 
-  console.log(`Stagehand Session Started`);
-  console.log(
-    `Watch live: https://browserbase.com/sessions/${stagehand.browserbaseSessionId}`
-  );
-
   const page = stagehand.context.pages()[0];
 
-  await page.goto("https://stagehand.dev");
+  console.info("Connected!");
 
-  const extractResult = await stagehand.extract(
-    "Extract the value proposition from the page."
-  );
-  console.log(`Extract result:\n`, extractResult);
+  const stdin = await readStdin();
+  if (!stdin.trim()) {
+    console.error(
+      "No JSON provided. Pipe JSON with url, time_text, party_size."
+    );
+    await stagehand.close();
+    process.exit(1);
+  }
 
-  const actResult = await stagehand.act("Click the 'Evals' button.");
-  console.log(`Act result:\n`, actResult);
+  const { url, time_text, party_size } = JSON.parse(stdin) as BookingInput;
 
-  const observeResult = await stagehand.observe("What can I click on this page?");
-  console.log(`Observe result:\n`, observeResult);
+  await new Promise((resolve) => setTimeout(resolve, 1000));
 
-  const agent = stagehand.agent({
-    systemPrompt: "You're a helpful assistant that can control a web browser.",
-  });
+  await page.goto(url);
+  await page.waitForLoadState("networkidle");
+  await stagehand.act(`zoom to 60%`);
+  await stagehand.observe("find the view full availability button");
+  await stagehand.act(`select party size ${party_size}`);
+  await stagehand.observe("find the view full availability button");
+  await stagehand.act("click the view full availability button");
+  await stagehand.act(`click the ${time_text} button`);
+  await stagehand.observe("find the phone number input box");
+  await stagehand.act("click the phone number input box");
+  await stagehand.observe("fill in the phone number 1234567890");
+  await stagehand.act("click the complete reservation button");
+  await stagehand.observe("find the phone continue box");
+  await stagehand.act("fill in the code 6093333333");
+  await stagehand.act("click the continue button");
 
-  const agentResult = await agent.execute(
-    "What is the most accurate model to use in Stagehand?"
-  );
-  console.log(`Agent result:\n`, agentResult);
+  console.info("Success!");
+
+  console.info("Waiting 30 seconds before closing...");
+  await new Promise((resolve) => setTimeout(resolve, 30000));
 
   await stagehand.close();
 }
