@@ -169,6 +169,68 @@ def mcp_server():
         except Exception as e:
             return {"status": "failed", "error": str(e)}
     
+    @mcp.tool(description="Get real-time Uber price estimates between two locations.")
+    def estimate_rideshare(
+        origin: str,
+        destination: str,
+    ) -> dict:
+        """
+        Scrape uber.com/price-estimate for live ride prices using Stagehand
+        with a persistent authenticated Browserbase context.
+
+        Args:
+            origin: Full pickup address/place name (e.g. "Soda Hall, Berkeley, CA")
+            destination: Full dropoff address/place name (e.g. "Noodle Dynasty, Berkeley, CA")
+        """
+        payload = {"origin": origin, "destination": destination}
+
+        try:
+            result = subprocess.run(
+                ["node", "--import", "tsx", "uber-estimate.ts"],
+                input=json.dumps(payload),
+                text=True,
+                capture_output=True,
+                timeout=120,
+                check=False,
+                cwd="/root/my-stagehand-app",
+                env={**os.environ, "CHROME_PATH": "/usr/bin/chromium"},
+            )
+
+            if result.returncode != 0:
+                return {
+                    "status": "failed",
+                    "error": "uber_estimate_failed",
+                    "stderr": result.stderr[-2000:],
+                    "stdout": result.stdout[-2000:],
+                }
+
+            # Parse last JSON line from stdout
+            lines = result.stdout.strip().split("\n")
+            for line in reversed(lines):
+                try:
+                    parsed = json.loads(line)
+                    if isinstance(parsed, dict):
+                        all_estimates = parsed.get("estimates", [])
+                        # Only keep rides people actually use
+                        keep = {"uberx", "uberxl", "share"}
+                        filtered = [
+                            e for e in all_estimates
+                            if e.get("service", "").lower() in keep
+                            and e.get("duration", "").lower() != "unavailable"
+                        ]
+                        parsed["estimates"] = filtered
+                        return parsed
+                    return {"status": "success", "output": parsed}
+                except:
+                    continue
+
+            return {"status": "success", "output": result.stdout}
+
+        except subprocess.TimeoutExpired:
+            return {"status": "failed", "error": "timeout"}
+        except Exception as e:
+            return {"status": "failed", "error": str(e)}
+
     # Get the MCP ASGI app - using 'streamable-http' transport which is more stable
     mcp_asgi = mcp.http_app(path="/mcp", stateless_http=True, transport="streamable-http")
     
