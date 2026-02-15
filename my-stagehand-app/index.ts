@@ -17,10 +17,18 @@ async function readStdin(): Promise<string> {
 
 async function main() {
   console.info("Launching browser...");
+  
+  const contextId = process.env.BROWSERBASE_CONTEXT_ID;
+  
   const stagehand = new Stagehand({
     env: "BROWSERBASE",
     modelApiKey: process.env.GOOGLE_API_KEY,
     model: "gemini-2.0-flash",
+    browserbaseSessionCreateParams: {
+      browserSettings: {
+        context: { id: contextId, persist: true },
+      },
+    },
   });
 
   await stagehand.init();
@@ -44,18 +52,11 @@ async function main() {
 
   await page.goto(url);
   await page.waitForLoadState("networkidle");
-  await stagehand.observe("find the view full availability button");
   await stagehand.act(`select party size ${party_size}`);
-  await stagehand.observe("find the view full availability button");
   await stagehand.act("click the view full availability button");
   await stagehand.act(`click the ${time_text} button`);
-  await stagehand.observe("find the phone number input box");
   await stagehand.act("click the phone number input box");
-  await stagehand.observe("fill in the phone number 1234567890");
   await stagehand.act("click the complete reservation button");
-  await stagehand.observe("find the phone continue box");
-  await stagehand.act("fill in the code 6093333333");
-  await stagehand.act("click the continue button");
 
   // Wait 3 seconds for page to load before extracting
   await new Promise((resolve) => setTimeout(resolve, 3000));
