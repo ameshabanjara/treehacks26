@@ -59,6 +59,28 @@ async function main() {
   await stagehand.act("fill in the code 6093333333");
   await stagehand.act("click the continue button");
 
+  // Extract confirmation and output JSON for MCP server
+  let confirmation: Record<string, unknown> | null = null;
+  try {
+    const extracted = await stagehand.extract(
+      "Extract reservation details: restaurant name, confirmation number, date, time, party size, address"
+    );
+    confirmation = typeof extracted === "object" && extracted ? (extracted as Record<string, unknown>) : null;
+  } catch {
+    // ignore
+  }
+
+  await new Promise((resolve) => setTimeout(resolve, 2000));
+
+  const result = {
+    success: true,
+    confirmation,
+    url,
+    time: time_text,
+    party_size,
+  };
+  console.log(JSON.stringify(result));
+
   console.info("Success!");
 
   console.info("Waiting 30 seconds before closing...");

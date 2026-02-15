@@ -706,6 +706,77 @@ def dispatch_booking_job(
         "relay": _make_relay(send=True, target="group", text=relay_text, request_id=request_id, plan_id=plan_id, stage="booking"),
     }
 
+@mcp.tool(description="Make a reservation using Browserbase/Stagehand to automate the OpenTable booking flow.")
+def make_reservation(
+    url: str,
+    time_text: str,
+    party_size: int,
+    plan_id: Optional[str] = None,
+    request_id: Optional[str] = None,
+    job_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Uses Stagehand (via TypeScript script) to automate the OpenTable reservation flow.
+    Requires: url (OpenTable restaurant page), time_text (e.g. "7:00 PM"), party_size.
+    """
+    import subprocess
+    from pathlib import Path
+
+    script_path = Path(__file__).parent.parent / "my-stagehand-app" / "index.ts"
+    if not script_path.exists():
+        return {"error": "Booking script not found", "success": False}
+
+    booking_input = {"url": url, "time_text": time_text, "party_size": int(party_size)}
+
+    try:
+        result = subprocess.run(
+            ["npx", "tsx", str(script_path)],
+            input=json.dumps(booking_input),
+            text=True,
+            capture_output=True,
+            timeout=120,
+            env={**os.environ},
+        )
+
+        if result.returncode != 0:
+            return {"error": result.stderr or result.stdout or "Unknown error", "success": False}
+
+        # Parse JSON output from script (last line with {...})
+        output_lines = result.stdout.strip().split("\n")
+        json_output = None
+        for line in reversed(output_lines):
+            line = line.strip()
+            if line.startswith("{") and line.endswith("}"):
+                try:
+                    json_output = json.loads(line)
+                    break
+                except json.JSONDecodeError:
+                    continue
+
+        if not json_output:
+            return {
+                "success": True,
+                "message": "Reservation completed",
+                "url": url,
+                "time": time_text,
+                "party_size": party_size,
+            }
+
+        conf = json_output.get("confirmation") or {}
+        return {
+            "success": True,
+            "restaurant_name": conf.get("restaurant_name") if isinstance(conf, dict) else None,
+            "confirmation_code": conf.get("confirmation_code") if isinstance(conf, dict) else None,
+            "address": conf.get("address") if isinstance(conf, dict) else None,
+            "time": time_text,
+            "party_size": party_size,
+            "raw": json_output,
+        }
+    except subprocess.TimeoutExpired:
+        return {"error": "Booking timed out", "success": False}
+    except Exception as e:
+        return {"error": str(e), "success": False}
+
 @mcp.tool(description="Finalize reservation details after Browserbase/Stagehand returns booking results.")
 def finalize_reservation(
     plan_id: str,
