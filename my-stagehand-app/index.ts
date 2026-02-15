@@ -1,4 +1,3 @@
-import "dotenv/config";
 import { Stagehand } from "@browserbasehq/stagehand";
 
 type BookingInput = {
