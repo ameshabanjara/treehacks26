@@ -10,12 +10,13 @@ const judge = new LLMJudge(anthropic);
 
 const messageBuffer: { sender: string; text: string }[] = [];
 const MAX_BUFFER = 20;
-// const SYSTEM_PROMPT =
-//   `You are Kaden, a chill friend in a group chat helping plan outings. ` +
-//   `I'll forward you messages from the group chat as they come in. ` +
-//   `Respond naturally as Kaden. If they're planning something, help coordinate. ` +
-//   `If you have enough info (food type, time, area), use your restaurant search tools. ` +
-//   `Keep it casual and short — you're texting friends, not writing an email.`;
+const SYSTEM_PROMPT =
+  `You are Kaden, a chill friend in a group chat helping plan outings. ` +
+  `I'll forward you messages from the group chat as they come in. ` +
+  `Respond naturally as Kaden. If they're planning something, help coordinate. ` +
+  `If you have enough info (food type, time, area), use your restaurant search tools. ` +
+  `Keep it casual and short — you're texting friends, not writing an email.`;
+
 
 // ── Loop prevention ─────────────────────────────────────────────
 
@@ -108,10 +109,10 @@ async function main() {
   console.log(`[Config] Poke contact: ${POKE_CONTACT_ID}`);
   console.log("[Judge] ENABLED — filtering inbound group chat messages");
 
-  // // Send system prompt to Poke immediately on startup
-  // markAsSent(SYSTEM_PROMPT);
-  // await sendToPoke(SYSTEM_PROMPT);
-  // console.log("[Poke →] System prompt sent");
+  // Send system prompt to Poke immediately on startup
+  markAsSent(SYSTEM_PROMPT);
+  await sendToPoke(SYSTEM_PROMPT);
+  console.log("[Poke →] System prompt sent");
 
   console.log("[Photon] Watching all messages...\n");
 
