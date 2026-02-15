@@ -39,7 +39,7 @@ async function main() {
       projectId: process.env.BROWSERBASE_PROJECT_ID!,
       browserSettings: {
         context: {
-          id: process.env.BROWSERBASE_UBER_CONTEXT_ID!,
+          id: (process.env.BROWSERBASE_UBER_CONTEXT_ID || process.env.BROWSERBASE_CONTEXT_ID)!,
           persist: false,
         },
       },
