@@ -1,13 +1,24 @@
 import "dotenv/config";
+import Anthropic from "@anthropic-ai/sdk";
+import { LLMJudge } from "./src/judge.js";
 import { sdk, sendToGroup, sendToPoke, GROUP_CHAT_ID, POKE_CONTACT_ID } from "./group-chat.js";
 
-// ── Rolling buffer of group chat messages ───────────────────────
+// ── Init ────────────────────────────────────────────────────────
+
+const anthropic = new Anthropic();
+const judge = new LLMJudge(anthropic);
 
 const messageBuffer: { sender: string; text: string }[] = [];
 const MAX_BUFFER = 20;
+// const SYSTEM_PROMPT =
+//   `You are Kaden, a chill friend in a group chat helping plan outings. ` +
+//   `I'll forward you messages from the group chat as they come in. ` +
+//   `Respond naturally as Kaden. If they're planning something, help coordinate. ` +
+//   `If you have enough info (food type, time, area), use your restaurant search tools. ` +
+//   `Keep it casual and short — you're texting friends, not writing an email.`;
 
 // ── Loop prevention ─────────────────────────────────────────────
-// Track messages we recently sent so we don't echo them back.
+
 const recentlySent = new Set<string>();
 
 function markAsSent(text: string) {
@@ -22,7 +33,7 @@ function wasSentByUs(text: string): boolean {
 }
 
 // ── Poke DM detection ───────────────────────────────────────────
-// Poke's DM chatId is something like "iMessage;-;+1234567890"
+
 function isPokeDM(chatId: string): boolean {
   if (!POKE_CONTACT_ID) return false;
   return chatId.includes(POKE_CONTACT_ID);
@@ -38,12 +49,11 @@ async function handleMessage(msg: {
 }) {
   if (!msg.text || msg.text.trim() === "") return;
 
-  // Debug: log every message so we can see chatId format
-  // console.log(`[DEBUG] chatId="${msg.chatId}" sender="${msg.sender}" isFromMe=${msg.isFromMe} text="${msg.text.slice(0, 60)}"`);
+  // ── Our own messages → ignore (loop prevention) ──────────────
+  if (msg.isFromMe) return;
 
-  // ── ROUTE 1: Group chat message from a friend ────────────────
-  // Forward to Poke so it can think + call MCP tools
-  if (msg.chatId === GROUP_CHAT_ID && !msg.isFromMe) {
+  // ── ROUTE 1: Group chat message (inbound) ────────────────────
+  if (msg.chatId === GROUP_CHAT_ID) {
     console.log(`[GC ←] ${msg.sender}: ${msg.text}`);
 
     messageBuffer.push({ sender: msg.sender, text: msg.text });
@@ -51,17 +61,19 @@ async function handleMessage(msg: {
       messageBuffer.shift();
     }
 
+    // Judge: only forward planning-relevant messages
+    const action = await judge.classify(msg.text, "inbound");
+    console.log(`[Judge] ${action} (state: ${judge.getState()})`);
+    if (action === "IGNORE") return;
+
+    // Forward full buffer to Poke
     const transcript = messageBuffer
       .map((m) => `${m.sender}: ${m.text}`)
       .join("\n");
 
     const pokeMessage =
-      `You are Kaden, a chill friend in a group chat helping plan outings. ` +
       `Here's the latest group chat conversation:\n\n${transcript}\n\n` +
-      `The most recent message is from ${msg.sender}: "${msg.text}"\n\n` +
-      `Respond naturally as Kaden. If they're planning something, help coordinate. ` +
-      `If you have enough info (food type, time, area), use your restaurant search tools. ` +
-      `Keep it casual and short — you're texting friends, not writing an email.`;
+      `The most recent message is from ${msg.sender}: "${msg.text}"`;
 
     markAsSent(pokeMessage);
     console.log(`[Poke →] Forwarding ${messageBuffer.length} msgs to Poke...`);
@@ -69,10 +81,8 @@ async function handleMessage(msg: {
     return;
   }
 
-  // ── ROUTE 2: Poke's DM response → relay to group chat ───────
-  // Poke thought about it, maybe called MCP tools, and replied in DM.
-  // We take that response and post it to the group as Kaden.
-  if (isPokeDM(msg.chatId) && !msg.isFromMe) {
+  // ── ROUTE 2: Poke DM response (outbound) ─────────────────────
+  if (isPokeDM(msg.chatId)) {
     console.log(`[Poke ←] ${msg.text.slice(0, 100)}...`);
 
     if (wasSentByUs(msg.text)) {
@@ -80,13 +90,12 @@ async function handleMessage(msg: {
       return;
     }
 
+    // TODO: re-enable judge here to detect CONCLUDE
+    // const action = await judge.classify(msg.text, "outbound");
+    // if (action === "IGNORE") return;
+
     markAsSent(msg.text);
     await sendToGroup(msg.text);
-    return;
-  }
-
-  // ── ROUTE 3: Our own messages → ignore (loop prevention) ────
-  if (msg.isFromMe) {
     return;
   }
 }
@@ -97,6 +106,13 @@ async function main() {
   console.log("Starting Kaden (Photon ↔ Poke bridge)...\n");
   console.log(`[Config] Group chat: ${GROUP_CHAT_ID}`);
   console.log(`[Config] Poke contact: ${POKE_CONTACT_ID}`);
+  console.log("[Judge] ENABLED — filtering inbound group chat messages");
+
+  // // Send system prompt to Poke immediately on startup
+  // markAsSent(SYSTEM_PROMPT);
+  // await sendToPoke(SYSTEM_PROMPT);
+  // console.log("[Poke →] System prompt sent");
+
   console.log("[Photon] Watching all messages...\n");
 
   await sdk.startWatching({
