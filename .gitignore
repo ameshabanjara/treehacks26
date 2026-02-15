@@ -213,4 +213,6 @@ marimo/_lsp/
 __marimo__/
 
 # Streamlit
-.streamlit/secrets.tomlsrc/server.py.save
+.streamlit/secrets.toml
+src/server.py.save
+node_modules
