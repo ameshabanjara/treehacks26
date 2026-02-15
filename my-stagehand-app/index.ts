@@ -44,7 +44,6 @@ async function main() {
 
   await page.goto(url);
   await page.waitForLoadState("networkidle");
-  await stagehand.act(`zoom to 60%`);
   await stagehand.observe("find the view full availability button");
   await stagehand.act(`select party size ${party_size}`);
   await stagehand.observe("find the view full availability button");
@@ -58,6 +57,9 @@ async function main() {
   await stagehand.act("fill in the code 6093333333");
   await stagehand.act("click the continue button");
 
+  // Wait 3 seconds for page to load before extracting
+  await new Promise((resolve) => setTimeout(resolve, 3000));
+
   // Extract confirmation and output JSON for MCP server
   let confirmation: Record<string, unknown> | null = null;
   try {
@@ -68,8 +70,6 @@ async function main() {
   } catch {
     // ignore
   }
-
-  await new Promise((resolve) => setTimeout(resolve, 2000));
 
   const result = {
     success: true,
