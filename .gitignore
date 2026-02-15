@@ -215,4 +215,8 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 src/server.py.save
-node_modules
+node_modules/
+.DS_Store
+bun.lockb
+messages.json
+.env.example

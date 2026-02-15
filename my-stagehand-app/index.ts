@@ -3,8 +3,13 @@ import { Stagehand } from "@browserbasehq/stagehand";
 
 async function main() {
   const stagehand = new Stagehand({
-    env: "BROWSERBASE",
-  });
+  env: "BROWSERBASE",
+  model: {
+    modelName: "anthropic/claude-haiku-4-5",
+    apiKey: process.env.ANTHROPIC_API_KEY,
+    baseURL: "https://custom-anthropic-endpoint.com",
+  },
+});
 
   await stagehand.init();
 
