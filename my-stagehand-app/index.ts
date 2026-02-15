@@ -19,7 +19,7 @@ async function readStdin(): Promise<string> {
 async function main() {
   console.info("Launching browser...");
   const stagehand = new Stagehand({
-    env: "LOCAL",
+    env: "BROWSERBASE",
     modelApiKey: process.env.GOOGLE_API_KEY,
     model: "gemini-2.0-flash",
   });
